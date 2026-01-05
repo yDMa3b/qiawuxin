@@ -1,835 +1,535 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="mobile-web-app-capable" content="yes">
-    <title>奶奶的卡五星（大师规则版）</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no" />
+    <title>奶奶的麻将</title>
     <style>
-        /* --- 全局样式 --- */
-        body {
-            background-color: #0b4d28; color: white; font-family: sans-serif;
-            margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column;
-            user-select: none; -webkit-user-select: none; overscroll-behavior: none;
+        /* 基础设置 */
+        html, body {
+            background-color: #0b4d28 !important; width: 100%; height: 100%; margin: 0; padding: 0;
+            overflow: hidden; user-select: none; -webkit-user-select: none;
         }
-        #start-overlay {
+        #start-layer {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); z-index: 9999;
-            display: flex; justify-content: center; align-items: center; flex-direction: column;
+            background: rgba(0,0,0,0.9); z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
         #start-btn {
-            padding: 20px 60px; font-size: 32px; background: #d32f2f; color: white;
-            border: 4px solid #fff; border-radius: 50px; font-weight: bold; cursor: pointer;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            font-size: 28px; padding: 15px 50px; background: #d32f2f; color: white;
+            border: 4px solid white; border-radius: 50px; font-weight: bold;
+        }
+        #debug-console {
+            position: fixed; top: 0; left: 0; width: 100%; background: rgba(0,0,0,0.5); 
+            color: #ffcccc; font-size: 12px; z-index: 10000; padding: 5px; pointer-events: none; display: none;
         }
         
-        /* --- 麻将牌 --- */
-        .tile {
-            width: 44px; height: 64px; background: #fff; border-radius: 4px;
-            box-shadow: 1px 2px 2px rgba(0,0,0,0.3), inset 0 0 0 1px #999;
-            position: relative; cursor: pointer; margin: 1px; flex-shrink: 0; display: inline-block;
-        }
-        .tile-face { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
-        .tile.selected { transform: translateY(-15px); background: #fffbe6; border: 2px solid yellow; }
-        .tile-dropped { transform: scale(0.75); margin: -8px -6px; border: 1px solid #ccc; }
-        .tile-meld { transform: scale(0.65); margin: -8px -6px; background: #eef; }
-        .tile-big { transform: scale(1.6); box-shadow: 0 0 15px yellow; z-index: 50; background: #fff; }
-        .tile-small-face { transform: scale(0.6); margin: -10px -8px; }
+        /* 界面布局 */
+        .header { height: 35px; display: flex; justify-content: flex-end; align-items: center; padding: 0 10px; font-size: 18px; color: gold; background: rgba(0,0,0,0.2); }
+        .main-area { flex: 1; display: flex; flex-direction: column; }
         
-        /* 听牌提示的小牌 */
-        .tile-tiny { transform: scale(0.5); margin: -15px -10px; border: 1px solid gold; background: #fffbe6; }
-
-        /* --- 布局 --- */
-        .header { height: 30px; display: flex; justify-content: flex-end; align-items: center; padding: 5px 10px; font-size: 18px; color: #ffd700; background: rgba(0,0,0,0.2); }
-        .opponents { flex: 1; display: flex; justify-content: space-between; padding: 5px; }
+        .opponents { height: 160px; display: flex; justify-content: space-between; padding: 5px; }
         .opp-box { width: 45%; display: flex; flex-direction: column; align-items: center; position: relative; }
-        .opp-name { font-size: 14px; color: #ccc; margin-bottom: 2px; text-shadow: 1px 1px 1px #000; }
+        .opp-name { font-size: 14px; color: #ddd; margin-bottom: 2px; text-shadow: 1px 1px 1px #000; }
         
-        .liang-tag {
-            background: #ff9800; color: #000; font-weight: bold; font-size: 12px;
-            padding: 1px 4px; border-radius: 3px; margin-left: 5px; display: none;
-            box-shadow: 0 0 5px red; animation: blink 2s infinite;
+        .liang-tag { background: #ff9800; color: black; font-weight: bold; font-size: 12px; padding: 1px 4px; border-radius: 3px; margin-left: 5px; display: none; border: 1px solid #fff; }
+        
+        /* 听牌提示框 */
+        .ting-box {
+            display: none; flex-wrap: wrap; justify-content: center; background: rgba(0,0,0,0.6); 
+            padding: 2px 5px; border-radius: 10px; border: 1px solid #ff9800; margin-bottom: 3px; min-height: 25px; align-items: center;
         }
-        @keyframes blink { 0%{opacity:1;} 50%{opacity:0.6;} 100%{opacity:1;} }
+        .ting-txt { color: #ff9800; font-size: 12px; margin-right: 3px; }
 
-        /* AI胡牌提示区 */
-        .ting-hint-box {
-            display: flex; height: 30px; background: rgba(0,0,0,0.5); 
-            border-radius: 15px; align-items: center; padding: 0 10px; margin-bottom: 2px;
-            border: 1px solid #ff9800; display: none; /* 默认隐藏 */
-        }
-        .ting-label { font-size: 12px; color: #ff9800; margin-right: 5px; white-space: nowrap;}
-        
-        .opp-hand { background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 10px; font-size: 12px; min-height: 20px;}
-        .opp-hand-open { display: flex; justify-content: center; flex-wrap: wrap; width: 100%; }
-        .opp-melds-area { display: flex; height: 40px; margin-bottom: 2px; justify-content: center;}
-        
-        .river {
-            background: rgba(0,0,0,0.15); border-radius: 6px; width: 95%; height: 85px;
-            display: flex; flex-wrap: wrap; align-content: flex-start; padding: 2px;
-        }
-        .center-stage { flex: 1.2; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #msg-text {
-            font-size: 22px; color: #fff; text-shadow: 1px 1px 2px #000;
-            background: rgba(0,0,0,0.6); padding: 8px 20px; border-radius: 20px; margin-bottom: 10px;
-        }
-        .big-tile-slot { height: 70px; width: 50px; display: flex; justify-content: center; align-items: center; }
-        
-        .player-stage { flex: 2; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 5px; }
+        .opp-hand { background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 8px; font-size: 12px; color: #ccc; }
+        .opp-hand-open { display: flex; justify-content: center; flex-wrap: wrap; } 
+        .opp-melds { display: flex; height: 32px; justify-content: center; margin-bottom: 2px; }
+        .river { width: 95%; height: 75px; background: rgba(0,0,0,0.2); border-radius: 5px; display: flex; flex-wrap: wrap; align-content: flex-start; padding: 2px; margin-top: 2px; }
+
+        .center-stage { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #msg { font-size: 22px; color: white; background: rgba(0,0,0,0.6); padding: 8px 20px; border-radius: 20px; margin-bottom: 10px; text-align: center; }
+        #big-card { width: 60px; height: 80px; display: flex; justify-content: center; align-items: center; }
+
+        /* 玩家区域 */
+        .my-area { height: 210px; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 5px; }
         .my-river-box { display: flex; justify-content: center; margin-bottom: 5px; }
-        .my-river { width: 65%; height: 60px; background: rgba(0,0,0,0.15); border-radius: 6px; display: flex; flex-wrap: wrap; justify-content: center; padding: 2px; }
-        .my-hand-row { display: flex; justify-content: center; align-items: flex-end; height: 80px; padding: 0 5px; }
-        .my-melds-area { display: flex; margin-right: 10px; } 
-        .new-tile-group { margin-left: 15px; border-left: 1px solid rgba(255,255,255,0.2); padding-left: 5px;}
-        .my-info { position: absolute; bottom: 90px; left: 10px; }
-        
-        /* 按钮 */
-        .btn-layer {
-            position: absolute; bottom: 100px; width: 100%;
-            display: flex; justify-content: center; gap: 10px; pointer-events: none; z-index: 100;
-        }
-        .btn {
-            pointer-events: auto; border: none; border-radius: 40px;
-            padding: 10px 20px; font-size: 20px; font-weight: bold;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.5); transform: scale(1); transition: transform 0.1s;
-        }
+        .my-river { width: 60%; height: 60px; background: rgba(0,0,0,0.2); border-radius: 5px; display: flex; flex-wrap: wrap; justify-content: center; padding: 2px; }
+        .my-info-row { display: flex; justify-content: center; align-items: center; height: 30px; margin-bottom: 5px; }
+        .hand-row { display: flex; justify-content: center; align-items: flex-end; height: 85px; padding: 0 5px; }
+        .my-melds { display: flex; margin-right: 10px; }
+        .my-hand { display: flex; }
+
+        .btn-layer { position: absolute; bottom: 120px; width: 100%; display: flex; justify-content: center; gap: 15px; pointer-events: none; z-index: 200; }
+        .btn { pointer-events: auto; padding: 10px 25px; border-radius: 30px; border: none; font-size: 20px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: transform 0.1s;}
         .btn:active { transform: scale(0.9); }
-        .btn-hu { background: #d32f2f; color: white; animation: pulse 0.8s infinite; }
+        .btn-hu { background: #d32f2f; color: white; animation: pulse 1s infinite; }
         .btn-peng { background: #1976d2; color: white; }
         .btn-gang { background: #7b1fa2; color: white; }
-        .btn-pass { background: #757575; color: white; }
-        .btn-liang { background: linear-gradient(to bottom, #ffeb3b, #fbc02d); color: #333; display: none; border: 2px solid #fff;}
-        .btn-out { background: #fbc02d; color: #333; display: none; padding: 10px 40px;}
-        
+        .btn-pass { background: #666; color: white; }
+        .btn-liang { background: linear-gradient(to bottom, #ffeb3b, #fbc02d); color: black; border: 2px solid white; display: none; }
+        .btn-out { background: gold; color: black; display: none; padding: 10px 40px; }
         @keyframes pulse { 0%{transform:scale(1);} 50%{transform:scale(1.1);} 100%{transform:scale(1);} }
 
-        .modal {
-            position: fixed; top:0; left:0; width:100%; height:100%;
-            background: rgba(0,0,0,0.85); display: none;
-            flex-direction: column; justify-content: center; align-items: center; z-index: 2000;
-        }
-        .result-card { background: white; color: #333; width: 85%; padding: 20px; border-radius: 10px; text-align: center; }
+        /* 牌样式 */
+        .tile { width: 42px; height: 60px; background: #fff; border-radius: 4px; margin: 1px; position: relative; display: inline-block; box-shadow: 1px 2px 2px rgba(0,0,0,0.3); }
+        .tile-face { width: 100%; height: 100%; }
+        .tile.selected { transform: translateY(-20px); border: 2px solid gold; background: #ffffe0; }
+        .tile-dropped { transform: scale(0.75); margin: -8px -5px; border: 1px solid #999; }
+        .tile-meld { transform: scale(0.7); margin: -8px -6px; background: #eef; }
+        .tile-big { transform: scale(1.5); box-shadow: 0 0 15px yellow; z-index: 100; background: #fff; }
+        .tile-small { transform: scale(0.6); margin: -10px -8px; }
+        .tile-tiny { transform: scale(0.5); margin: -15px -10px; background: #fffbe6; border: 1px solid orange; }
+
+        .modal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.85); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 5000; }
+        .res-box { background: white; color: #333; width: 80%; padding: 20px; border-radius: 10px; text-align: center; }
         .res-score { font-size: 40px; font-weight: bold; color: #d32f2f; margin: 15px 0; }
-        .res-btn { padding: 12px 35px; background: #388e3c; color: white; border: none; border-radius: 30px; font-size: 22px;}
-        #error-log { position: fixed; top: 0; left: 0; background: red; color: white; z-index: 10000; font-size: 12px; display: none; }
     </style>
 </head>
 <body>
-    <div id="error-log"></div>
-    <div id="start-overlay">
-        <button id="start-btn" onclick="initGameSafe()">点我开始游戏</button>
+    <div id="debug-console"></div>
+    <div id="start-layer">
+        <button id="start-btn" onclick="startGame()">开始游戏</button>
     </div>
-
-    <div class="header">💰 <span id="my-score">10000</span></div>
-
-    <div class="opponents">
-        <!-- 上家 -->
-        <div class="opp-box">
-            <div class="opp-name">⬅️ 电脑上家 <span class="liang-tag" id="p2-liang-tag">亮</span></div>
-            <!-- AI听牌提示 -->
-            <div class="ting-hint-box" id="p2-ting-box">
-                <span class="ting-label">胡:</span>
-                <div id="p2-ting-tiles" style="display:flex;"></div>
+    <div class="header">💰 <span id="score">10000</span></div>
+    <div class="main-area">
+        <div class="opponents">
+            <div class="opp-box">
+                <div class="opp-name">⬅️ 上家 <span class="liang-tag" id="tag-2">亮</span></div>
+                <div class="ting-box" id="ting-box-2"><span class="ting-txt">胡:</span><div id="ting-tiles-2" style="display:flex"></div></div>
+                <div class="opp-melds" id="melds-2"></div>
+                <div class="opp-hand" id="hand-2">剩13张</div>
+                <div class="river" id="river-2"></div>
             </div>
-            <div class="opp-melds-area" id="p2-melds"></div>
-            <div class="opp-hand" id="p2-hand-area">剩13张</div>
-            <div class="river" id="p2-river"></div>
-        </div>
-        <!-- 下家 -->
-        <div class="opp-box">
-            <div class="opp-name">电脑下家 ➡️ <span class="liang-tag" id="p1-liang-tag">亮</span></div>
-            <div class="ting-hint-box" id="p1-ting-box">
-                <span class="ting-label">胡:</span>
-                <div id="p1-ting-tiles" style="display:flex;"></div>
+            <div class="opp-box">
+                <div class="opp-name">下家 ➡️ <span class="liang-tag" id="tag-1">亮</span></div>
+                <div class="ting-box" id="ting-box-1"><span class="ting-txt">胡:</span><div id="ting-tiles-1" style="display:flex"></div></div>
+                <div class="opp-melds" id="melds-1"></div>
+                <div class="opp-hand" id="hand-1">剩13张</div>
+                <div class="river" id="river-1"></div>
             </div>
-            <div class="opp-melds-area" id="p1-melds"></div>
-            <div class="opp-hand" id="p1-hand-area">剩13张</div>
-            <div class="river" id="p1-river"></div>
+        </div>
+        <div class="center-stage">
+            <div id="msg">准备开始</div>
+            <div id="big-card"></div>
+        </div>
+        <div class="my-area">
+            <div class="my-river-box"><div class="my-river" id="river-0"></div></div>
+            <div class="my-info-row">
+                <span class="liang-tag" id="tag-0" style="font-size:16px; padding:5px;">已亮倒</span>
+                <div class="ting-box" id="ting-box-0" style="margin-left:10px; display:none;">
+                    <span class="ting-txt">你胡:</span><div id="ting-tiles-0" style="display:flex"></div>
+                </div>
+            </div>
+            <div class="hand-row">
+                <div class="my-melds" id="melds-0"></div>
+                <div class="my-hand" id="hand-0"></div>
+            </div>
         </div>
     </div>
-
-    <div class="center-stage">
-        <div id="msg-text">请点击开始...</div>
-        <div class="big-tile-slot" id="big-card"></div>
+    <div class="btn-layer" id="btn-box">
+        <button class="btn btn-liang" id="btn-liang" onclick="actLiang()">亮倒</button>
+        <button class="btn btn-gang" id="btn-gang-self" style="display:none" onclick="actGangSelf()">杠</button>
+        <button class="btn btn-out" id="btn-out" onclick="actDiscard()">出牌</button>
     </div>
-
-    <div class="my-info">
-        <span class="liang-tag" id="my-liang-tag" style="display:none; font-size:16px; padding:5px; background:red; color:white;">已亮倒 (只能摸打)</span>
-    </div>
-
-    <div class="btn-layer" id="btn-group">
-        <button class="btn btn-liang" id="btn-liang" onclick="userLiang()">亮倒</button>
-        <button class="btn btn-gang" id="btn-self-gang" style="display:none;" onclick="userSelfGang()">杠</button>
-        <button class="btn btn-out" id="btn-out" onclick="userDiscard()">出牌</button>
-    </div>
-
-    <div class="player-stage">
-        <div class="my-river-box"><div class="my-river" id="my-river"></div></div>
-        <div class="my-hand-row">
-            <div class="my-melds-area" id="my-melds"></div>
-            <div id="my-hand" style="display:flex;"></div>
-            <div class="new-tile-group" id="my-new"></div>
-        </div>
-    </div>
-
     <div class="modal" id="modal">
-        <div class="result-card">
+        <div class="res-box">
             <h2 id="res-title">胡牌啦</h2>
             <div id="res-desc">卡五星</div>
             <div class="res-score" id="res-score">+3200</div>
-            <button class="res-btn" onclick="initGameSafe()">再来一局</button>
+            <button class="btn" style="background:#388e3c; color:white; padding:10px 30px;" onclick="startGame()">再来一局</button>
         </div>
     </div>
 
 <script>
-    // 错误捕获
+    // 错误处理
+    var debug = document.getElementById('debug-console');
     window.onerror = function(msg, url, line) {
-        var el = document.getElementById('error-log');
-        el.style.display = 'block'; el.innerText = "Err: " + msg + " (" + line + ")";
-        return false;
+        debug.style.display = 'block'; debug.innerHTML += "Err: " + msg + " (L" + line + ")<br>"; return false;
     };
 
-    // --- 绘图引擎 ---
-    var COLORS = { blue: "#0055aa", green: "#008800", red: "#cc0000" };
+    // --- 绘图引擎 (修复白板) ---
+    var COLORS = { b: "#0055aa", g: "#008800", r: "#cc0000" };
     function getSvg(val) {
         var svg = '<svg viewBox="0 0 100 130" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">';
         if (val >= 0 && val <= 8) svg += drawTong(val + 1);
         else if (val >= 9 && val <= 17) svg += drawTiao(val - 8);
-        else if (val === 18) svg += '<text x="50" y="80" font-size="60" fill="'+COLORS.red+'" text-anchor="middle" font-weight="bold">中</text>';
-        else if (val === 19) svg += '<text x="50" y="80" font-size="60" fill="'+COLORS.green+'" text-anchor="middle" font-weight="bold">發</text>';
-        else if (val === 20) svg += '<rect x="15" y="20" width="70" height="90" fill="none" stroke="'+COLORS.blue+'" stroke-width="4" rx="5" />';
-        svg += '</svg>';
-        return svg;
-    }
-    function drawTong(n) {
-        var c = "";
-        if (n===1) return '<circle cx="50" cy="65" r="35" fill="'+COLORS.red+'" /><circle cx="50" cy="65" r="15" fill="#fff" /><circle cx="50" cy="65" r="8" fill="'+COLORS.red+'" />';
-        var pos = [];
-        if(n===2) pos=[[50,35],[50,95]];
-        if(n===3) pos=[[25,30],[50,65],[75,100]];
-        if(n===4) pos=[[25,35],[75,35],[25,95],[75,95]];
-        if(n===5) pos=[[25,35],[75,35],[50,65],[25,95],[75,95]];
-        if(n===6) pos=[[25,35],[75,35],[25,65],[75,65],[25,95],[75,95]];
-        if(n===8) pos=[[25,25],[75,25],[25,50],[75,50],[25,75],[75,75],[25,100],[75,100]];
-        if(n===9) pos=[[20,25],[50,25],[80,25], [20,65],[50,65],[80,65], [20,105],[50,105],[80,105]];
-        if(n===7) return '<circle cx="20" cy="30" r="12" fill="'+COLORS.green+'"/><circle cx="50" cy="40" r="12" fill="'+COLORS.green+'"/><circle cx="80" cy="50" r="12" fill="'+COLORS.green+'"/><circle cx="30" cy="80" r="12" fill="'+COLORS.red+'"/><circle cx="70" cy="80" r="12" fill="'+COLORS.red+'"/><circle cx="30" cy="110" r="12" fill="'+COLORS.red+'"/><circle cx="70" cy="110" r="12" fill="'+COLORS.red+'"/>';
-        for(var i=0; i<pos.length; i++) {
-            var color = COLORS.blue;
-            if((n===5 && i===2) || (n===3 && i===1)) color = COLORS.red;
-            c += '<circle cx="'+pos[i][0]+'" cy="'+pos[i][1]+'" r="'+(n===9?11:13)+'" fill="'+color+'" />';
+        else if (val === 18) svg += txt("中", COLORS.r);
+        else if (val === 19) svg += txt("發", COLORS.g);
+        else if (val === 20) {
+            // 修复：白板画成双层蓝框，更醒目
+            svg += '<rect x="15" y="20" width="70" height="90" fill="none" stroke="'+COLORS.b+'" stroke-width="6" rx="5"/>';
+            svg += '<rect x="25" y="30" width="50" height="70" fill="none" stroke="'+COLORS.b+'" stroke-width="2" rx="3"/>';
         }
-        return c;
+        svg += '</svg>'; return svg;
     }
-    function drawTiao(n) {
-        if (n===1) return '<path d="M50,30 Q70,30 75,50 Q80,70 50,70 Q30,70 30,50 Q30,30 50,30 M50,45 Q55,45 55,50 M35,60 L65,60 M50,70 L50,100 M40,100 L60,100" stroke="'+COLORS.green+'" stroke-width="3" fill="none" /><circle cx="55" cy="45" r="2" fill="black" />';
-        var s = ""; var g = COLORS.green, b = COLORS.blue, r = COLORS.red;
-        if (n===2) s += rect(45,20,g) + rect(45,70,b);
-        else if (n===3) s += rect(25,20,g) + rect(45,50,r) + rect(65,80,g);
-        else if (n===4) s += rect(30,20,g)+rect(60,20,g)+rect(30,70,b)+rect(60,70,b);
-        else if (n===5) s += rect(20,20,g)+rect(70,20,g)+rect(45,50,r)+rect(20,80,b)+rect(70,80,b);
-        else if (n===6) { for(var i=0;i<3;i++) s+=rect(30+i*20,30,g)+rect(30+i*20,70,b); }
-        else if (n===8) { for(var i=0;i<4;i++) s+=rect(20+i*18,20,g)+rect(20+i*18,80,b); }
-        else if (n===7) { for(var i=0;i<3;i++) s+=rect(30+i*20,20,g); for(var i=0;i<4;i++) s+=rect(20+i*18,70,g); }
-        else if (n===9) { for(var j=0;j<3;j++) for(var i=0;i<3;i++) s+=rect(30+i*20,15+j*35, j===1?r:(j===0?g:b), 6, 25); }
-        return s;
+    function txt(t,c){return '<text x="50" y="80" font-size="60" fill="'+c+'" text-anchor="middle" font-weight="bold">'+t+'</text>';}
+    function drawTong(n) {
+        if(n===1) return cir(50,65,COLORS.r,35)+cir(50,65,'#fff',15)+cir(50,65,COLORS.r,8);
+        if(n===7) return cir(20,30,COLORS.g)+cir(50,40,COLORS.g)+cir(80,50,COLORS.g)+cir(30,80,COLORS.r)+cir(70,80,COLORS.r)+cir(30,110,COLORS.r)+cir(70,110,COLORS.r);
+        var p=[];
+        if(n===2)p=[[50,35],[50,95]];if(n===3)p=[[25,30],[50,65],[75,100]];if(n===4)p=[[25,35],[75,35],[25,95],[75,95]];
+        if(n===5)p=[[25,35],[75,35],[50,65],[25,95],[75,95]];if(n===6)p=[[25,35],[75,35],[25,65],[75,65],[25,95],[75,95]];
+        if(n===8)p=[[25,25],[75,25],[25,50],[75,50],[25,75],[75,75],[25,100],[75,100]];
+        if(n===9)p=[[20,25],[50,25],[80,25],[20,65],[50,65],[80,65],[20,105],[50,105],[80,105]];
+        var h=""; for(var i=0;i<p.length;i++) h+=cir(p[i][0],p[i][1],(n===5&&i===2||n===3&&i===1)?COLORS.r:COLORS.b,(n===9?11:13)); return h;
     }
-    function rect(x,y,c,w,h) { return '<rect x="'+x+'" y="'+y+'" width="'+(w||8)+'" height="'+(h||30)+'" fill="'+c+'" />'; }
+    function cir(x,y,c,r){return '<circle cx="'+x+'" cy="'+y+'" r="'+(r||12)+'" fill="'+c+'"/>';}
+    function drawTiao(n){
+        if(n===1)return '<path d="M50,30 Q70,30 75,50 Q80,70 50,70 Q30,70 30,50 Q30,30 50,30 M50,45 Q55,45 55,50 M35,60 L65,60 M50,70 L50,100 M40,100 L60,100" stroke="'+COLORS.g+'" stroke-width="3" fill="none"/>';
+        var h=""; 
+        if(n===2)h=rec(45,20,COLORS.g)+rec(45,70,COLORS.b);
+        if(n===3)h=rec(25,20,COLORS.g)+rec(45,50,COLORS.r)+rec(65,80,COLORS.g);
+        if(n===4)h=rec(30,20,COLORS.g)+rec(60,20,COLORS.g)+rec(30,70,COLORS.b)+rec(60,70,COLORS.b);
+        if(n===5)h=rec(20,20,COLORS.g)+rec(70,20,COLORS.g)+rec(45,50,COLORS.r)+rec(20,80,COLORS.b)+rec(70,80,COLORS.b);
+        if(n===6){for(var i=0;i<3;i++)h+=rec(30+i*20,30,COLORS.g)+rec(30+i*20,70,COLORS.b);}
+        if(n===8){for(var i=0;i<4;i++)h+=rec(20+i*18,20,COLORS.g)+rec(20+i*18,80,COLORS.b);}
+        if(n===7){for(var i=0;i<3;i++)h+=rec(30+i*20,20,COLORS.g);for(var i=0;i<4;i++)h+=rec(20+i*18,70,COLORS.g);}
+        if(n===9){for(var j=0;j<3;j++)for(var i=0;i<3;i++)h+=rec(30+i*20,15+j*35,j===1?COLORS.r:(j===0?COLORS.g:COLORS.b),6,25);} return h;
+    }
+    function rec(x,y,c,w,h){return '<rect x="'+x+'" y="'+y+'" width="'+(w||8)+'" height="'+(h||30)+'" fill="'+c+'"/>';}
 
     // --- 游戏逻辑 ---
-    var game = {
-        deck: [],
-        players: [
-            { id:0, score:10000, hand:[], melds:[], river:[], isAi:false, isLiang:false, tingList:[] },
-            { id:1, score:10000, hand:[], melds:[], river:[], isAi:true, isLiang:false, tingList:[] },
-            { id:2, score:10000, hand:[], melds:[], river:[], isAi:true, isLiang:false, tingList:[] }
-        ],
-        turn: 0, lastCard: -1, lastPlayer: -1, selectIdx: -1, hasDrawn: false, gangInfo: null
-    };
+    var G = { deck:[], ps:[], turn:0, last:-1, from:-1, sel:-1, drawn:false, gangInfo:null };
 
-    function updateScore() { document.getElementById('my-score').innerText = game.players[0].score; }
-
-    function initGameSafe() {
+    function startGame() {
         try {
-            document.getElementById('start-overlay').style.display = 'none';
+            document.getElementById('start-layer').style.display = 'none';
             document.getElementById('modal').style.display = 'none';
-            document.getElementById('my-liang-tag').style.display = 'none';
-            document.getElementById('p1-liang-tag').style.display = 'none';
-            document.getElementById('p2-liang-tag').style.display = 'none';
-            document.getElementById('p1-ting-box').style.display = 'none';
-            document.getElementById('p2-ting-box').style.display = 'none';
-            hideActions();
-
-            var deck = [];
-            for(var i=0;i<=20;i++) for(var k=0;k<4;k++) deck.push(i);
-            for(var i=deck.length-1; i>0; i--) {
-                var j=Math.floor(Math.random()*(i+1));
-                var temp = deck[i]; deck[i] = deck[j]; deck[j] = temp;
-            }
-            game.deck = deck;
-
-            for(var p=0; p<3; p++) {
-                game.players[p].hand = [];
-                game.players[p].melds = [];
-                game.players[p].river = [];
-                game.players[p].isLiang = false;
-                game.players[p].tingList = [];
-                for(var m=0; m<13; m++) game.players[p].hand.push(deck.pop());
-                game.players[p].hand.sort(function(a,b){return a-b});
-            }
-
-            game.turn = 0; game.hasDrawn = false; game.selectIdx = -1;
-            render(); updateScore();
-            setMsg("游戏开始，庄家摸牌");
-            setTimeout(performDraw, 600);
-        } catch(e) { alert("启动失败: " + e.message); }
+            resetData(); render(); updateScoreUI();
+            setMsg("游戏开始，庄家摸牌"); setTimeout(drawCard, 500);
+        } catch(e) { alert("启动报错: " + e.message); }
     }
 
-    function performDraw() {
-        if(game.deck.length === 0) {
-            showResult(false, "流局", 0, "没牌了");
-            return;
+    function resetData() {
+        hideActs();
+        G.deck=[]; for(var i=0;i<=20;i++) for(var k=0;k<4;k++) G.deck.push(i);
+        for(var i=G.deck.length-1;i>0;i--) { var j=Math.floor(Math.random()*(i+1)); var t=G.deck[i]; G.deck[i]=G.deck[j]; G.deck[j]=t; }
+        if(G.ps.length===0) for(var i=0;i<3;i++) G.ps.push({ score:10000 });
+        for(var i=0;i<3;i++) {
+            G.ps[i].hand = []; G.ps[i].meld = []; G.ps[i].river = []; G.ps[i].liang = false; G.ps[i].ting = [];
+            for(var m=0;m<13;m++) G.ps[i].hand.push(G.deck.pop());
+            G.ps[i].hand.sort(function(a,b){return a-b});
         }
-        var p = game.players[game.turn];
-        var c = game.deck.pop();
-        p.hand.push(c);
-        
-        if(!p.isAi) {
-            game.hasDrawn = true; game.selectIdx = -1;
-            render();
-            
-            // 亮倒后逻辑：锁定手牌，只能自摸或打出
-            if(p.isLiang) {
-                setMsg("已亮倒，自动摸打...");
-                if(checkWin(p.hand, p.melds)) {
-                     showActions(['HU', 'PASS']); // PASS就是打出
-                     setMsg("自摸！");
-                } else {
-                    // 强制打出刚摸的牌 (即最后一张)
-                    setTimeout(function() {
-                        userDiscardForced(p.hand.length - 1);
-                    }, 1000);
-                }
+        G.turn = 0; G.drawn = false; G.sel = -1;
+    }
+
+    function drawCard() {
+        if(G.deck.length==0) { alert("流局"); startGame(); return; }
+        var p = G.ps[G.turn]; var c = G.deck.pop(); p.hand.push(c);
+        if(G.turn == 0) { 
+            G.drawn = true; G.sel = -1; render();
+            // 亮倒后逻辑
+            if(p.liang) {
+                setMsg("已亮倒：请打出刚摸的牌");
+                if(checkWin(p.hand, p.meld)) { showActs(['HU','PASS']); setMsg("亮倒自摸！"); }
                 return;
             }
-
             // 正常逻辑
-            if(checkWin(p.hand, p.melds)) {
-                showActions(['HU', 'PASS']);
-                setMsg("摸到好牌了！");
-            } else {
+            if(checkWin(p.hand, p.meld)) { showActs(['HU','PASS']); setMsg("摸到好牌！"); } 
+            else {
                 setMsg("请出牌");
-                // 检查听牌才显示亮
-                if(getTingTiles(p.hand, p.melds).length > 0) {
-                    document.getElementById('btn-liang').style.display = 'block';
-                }
-                // 检查暗杠
-                var gangRes = checkSelfGang(p);
-                if(gangRes) {
-                    game.gangInfo = gangRes;
-                    document.getElementById('btn-self-gang').style.display = 'block';
-                }
+                if(checkCanLiang(p.hand, p.meld)) document.getElementById('btn-liang').style.display='block';
+                var g = checkGang(p);
+                if(g) { G.gangInfo=g; document.getElementById('btn-gang-self').style.display='block'; }
             }
-        } else {
-            render();
-            setMsg(game.turn===1?"下家思考...":"上家思考...");
+        } else { // 电脑
+            render(); setMsg((G.turn==1?"下家":"上家")+"思考中...");
             setTimeout(function(){ aiPlay(p); }, 800);
         }
     }
 
-    // 辅助：获取听哪些牌
-    function getTingTiles(hand, melds) {
-        var tempHand = hand.slice();
-        var tings = [];
-        // 遍历打哪张
-        for(var i=0; i<tempHand.length; i++) {
-            var discard = tempHand[i];
-            var remain = tempHand.slice();
-            remain.splice(i, 1);
-            // 遍历胡哪张
-            for(var tile=0; tile<=20; tile++) {
-                var test = remain.slice();
-                test.push(tile);
-                test.sort(function(a,b){return a-b});
-                if(checkWin(test, melds)) {
-                    // 只要能胡一张，就说明这手牌能听
-                    // 这里我们只返回true表示能听，不做详细分析
-                    return [1]; 
-                }
-            }
+    // 修复：严格查听逻辑 (遍历手牌，假设打出每一张，看剩下13张是否听牌)
+    function checkCanLiang(hand14, melds) {
+        for(var i=0; i<hand14.length; i++) {
+            var temp = hand14.slice();
+            temp.splice(i, 1); // 模拟打出这张
+            var tings = getWinTiles(temp, melds);
+            if(tings.length > 0) return true; // 只要能听，就允许亮
         }
-        return [];
+        return false;
     }
-    
-    // 获取这手牌胡什么 (用于AI亮牌显示)
-    function getWinningTiles(hand, melds) {
+
+    function getWinTiles(h13, m) {
         var wins = [];
-        // 手牌是13张，检查缺什么
-        for(var tile=0; tile<=20; tile++) {
-            var test = hand.slice();
-            test.push(tile);
-            test.sort(function(a,b){return a-b});
-            if(checkWin(test, melds)) wins.push(tile);
+        for(var t=0;t<=20;t++) {
+            var test = h13.slice(); test.push(t); test.sort(function(a,b){return a-b});
+            if(checkWin(test, m)) wins.push(t);
         }
         return wins;
     }
 
-    function checkSelfGang(p) {
-        for(var i=0; i<p.hand.length; i++) {
-            var t = p.hand[i];
-            for(var m=0; m<p.melds.length; m++) if(p.melds[m].type === 'peng' && p.melds[m].val === t) return {type:'BUGANG', val:t};
-        }
-        var counts = {};
-        for(var i=0; i<p.hand.length; i++) counts[p.hand[i]] = (counts[p.hand[i]]||0)+1;
-        for(var k in counts) if(counts[k] === 4) return {type:'ANGANG', val:parseInt(k)};
-        return null;
-    }
-
-    function userSelfGang() {
-        var p = game.players[0];
-        var info = game.gangInfo;
-        if(!info) return;
-        if(info.type === 'ANGANG') {
-            remove(p.hand, info.val, 4);
-            p.melds.push({val: info.val, type:'gang'});
-        } else {
-            remove(p.hand, info.val, 1);
-            for(var m=0; m<p.melds.length; m++) if(p.melds[m].val === info.val && p.melds[m].type === 'peng') { p.melds[m].type = 'gang'; break; }
-        }
-        game.gangInfo = null; document.getElementById('btn-self-gang').style.display = 'none';
-        setMsg("杠牌！摸一张");
-        render(); setTimeout(performDraw, 600);
-    }
-
     function aiPlay(p) {
-        if(checkWin(p.hand, p.melds)) {
-            showResult(false, "电脑胡了", -500, "电脑自摸");
-            return;
-        }
+        if(checkWin(p.hand, p.meld)) { showResult(false, "电脑胡了", -500, "自摸"); return; }
         
-        // AI 亮倒逻辑：如果听牌，大概率亮倒
-        if(!p.isLiang) {
-            var wins = getWinningTiles(p.hand, p.melds);
-            if(wins.length > 0 && Math.random() < 0.8) {
-                p.isLiang = true;
-                p.tingList = wins; // 记录它胡什么
-            }
-        }
-        
-        // 如果AI亮倒了，强制摸打
-        if(p.isLiang) {
-             // 刚摸的牌是最后一张
-             var card = p.hand.pop(); 
-             // 必须打出
-             game.lastCard = card; game.lastPlayer = game.turn; game.hasDrawn = false;
-             showBig(card); render();
-             checkResponse();
-             return;
-        }
-
-        // 正常出牌逻辑 + 防守
-        // 防守：如果玩家(id=0)亮了，AI绝对不打玩家胡的牌
-        var dangerousTiles = [];
-        if(game.players[0].isLiang) {
-             dangerousTiles = getWinningTiles(game.players[0].hand, game.players[0].melds);
-        }
-
-        var counts = {};
-        for(var i=0; i<p.hand.length; i++) counts[p.hand[i]] = (counts[p.hand[i]]||0)+1;
-        
-        var bestDiscard = -1;
-        
-        // 尝试找一张不危险的牌
-        for(var i=0; i<p.hand.length; i++) {
-            var t = p.hand[i];
-            if(dangerousTiles.indexOf(t) === -1) {
-                // 这张安全，优先打单张
-                if(counts[t] === 1) {
-                    if(t >= 18) { bestDiscard = i; break; } // 字牌
-                    if(bestDiscard === -1) bestDiscard = i; // 序数牌
+        if(!p.liang) {
+            for(var i=0; i<p.hand.length; i++) {
+                var temp = p.hand.slice();
+                var cardToDiscard = temp.splice(i, 1)[0];
+                var tings = getWinTiles(temp, p.meld);
+                if(tings.length > 0 && Math.random()<0.8) {
+                    p.liang = true; p.ting = tings;
+                    p.hand = temp; G.last = cardToDiscard; G.from = G.turn; G.drawn = false;
+                    showBig(cardToDiscard); render(); checkResp();
+                    return;
                 }
             }
         }
-        // 如果找不到安全的单张，就随机打一张不危险的
-        if(bestDiscard === -1) {
-             for(var i=0; i<p.hand.length; i++) {
-                 if(dangerousTiles.indexOf(p.hand[i]) === -1) {
-                     bestDiscard = i; break;
-                 }
-             }
-        }
-        // 如果全是危险牌... 没办法，只能拼了(随机)
-        if(bestDiscard === -1) bestDiscard = Math.floor(Math.random()*p.hand.length);
+        if(p.liang) { var c = p.hand.pop(); playCard(c); return; }
         
-        var card = p.hand.splice(bestDiscard, 1)[0];
-        p.hand.sort(function(a,b){return a-b});
-        
-        game.lastCard = card; game.lastPlayer = game.turn; game.hasDrawn = false;
-        showBig(card); render();
-        checkResponse();
-    }
-
-    function checkResponse() {
-        var card = game.lastCard;
-        var from = game.lastPlayer;
-        
-        if(from !== 0) {
-            var p0 = game.players[0];
-            var acts = [];
-            var checkH = p0.hand.slice(); checkH.push(card); checkH.sort(function(a,b){return a-b});
-            if(checkWin(checkH, p0.melds)) acts.push('HU');
-            
-            // 亮倒后不能碰杠
-            if(!p0.isLiang) {
-                var c = 0; for(var i=0;i<p0.hand.length;i++) if(p0.hand[i]===card) c++;
-                if(c>=2) acts.push('PENG');
-                if(c===3) acts.push('GANG');
-            }
-            
-            if(acts.length>0) {
-                acts.push('PASS');
-                showActions(acts);
-                setMsg("您有操作机会");
-                return; 
+        var danger = []; if(G.ps[0].liang) danger = G.ps[0].ting;
+        var counts={}; for(var i=0;i<p.hand.length;i++) counts[p.hand[i]]=(counts[p.hand[i]]||0)+1;
+        var best = -1;
+        for(var i=0; i<p.hand.length; i++) {
+            var t = p.hand[i];
+            if(danger.indexOf(t) === -1) {
+                if(counts[t] === 1) { if(t>=18) { best=i; break; } if(best===-1) best=i; }
             }
         }
-        var nextP = (from + 1) % 3;
-        var prevP = (from + 2) % 3;
-        if(tryAiResponse(nextP, card)) return;
-        if(tryAiResponse(prevP, card)) return;
-        game.players[from].river.push(card);
-        nextTurn();
+        if(best===-1) best = Math.floor(Math.random()*p.hand.length);
+        var c = p.hand.splice(best, 1)[0]; p.hand.sort(function(a,b){return a-b});
+        playCard(c);
     }
-    
-    function tryAiResponse(aiId, card) {
-        if(aiId === 0 || aiId === game.lastPlayer) return false; 
-        var p = game.players[aiId];
-        
-        // 1. 胡
-        var checkH = p.hand.slice(); checkH.push(card); checkH.sort(function(a,b){return a-b});
-        if(checkWin(checkH, p.melds)) {
-             showResult(false, "电脑胡了", -800, "电脑捉炮");
-             return true;
-        }
-        
-        // 亮倒后不能碰杠
-        if(p.isLiang) return false;
 
-        var c = 0; for(var i=0;i<p.hand.length;i++) if(p.hand[i]===card) c++;
-        if(c===3) { performAiAction(aiId, 'GANG', card); return true; }
-        if(c>=2 && Math.random()<0.8) { performAiAction(aiId, 'PENG', card); return true; }
+    function playCard(c) {
+        G.last = c; G.from = G.turn; G.drawn = false;
+        showBig(c); render(); checkResp();
+    }
+
+    function checkResp() {
+        var c = G.last;
+        if(G.from != 0) {
+            var p = G.ps[0]; var acts = [];
+            var tmp = p.hand.slice(); tmp.push(c); tmp.sort(function(a,b){return a-b});
+            if(checkWin(tmp, p.meld)) acts.push('HU');
+            if(!p.liang) {
+                var cnt=0; for(var i=0;i<p.hand.length;i++) if(p.hand[i]==c) cnt++;
+                if(cnt>=2) acts.push('PENG'); if(cnt==3) acts.push('GANG');
+            }
+            if(acts.length>0) { acts.push('PASS'); showActs(acts); setMsg("有操作"); return; }
+        }
+        var n1 = (G.from+1)%3; if(aiResp(n1, c)) return;
+        var n2 = (G.from+2)%3; if(aiResp(n2, c)) return;
+        G.ps[G.from].river.push(c); nextTurn();
+    }
+
+    function aiResp(id, c) {
+        if(id==0 || id==G.from) return false;
+        var p = G.ps[id];
+        var tmp = p.hand.slice(); tmp.push(c); tmp.sort(function(a,b){return a-b});
+        if(checkWin(tmp, p.meld)) { showResult(false, "电脑胡了", -800, "捉炮"); return true; }
+        if(p.liang) return false;
+        var cnt=0; for(var i=0;i<p.hand.length;i++) if(p.hand[i]==c) cnt++;
+        if(cnt==3) { aiAct(id, 'gang', c); return true; }
+        if(cnt>=2 && Math.random()<0.6) { aiAct(id, 'peng', c); return true; }
         return false;
     }
-    
-    function performAiAction(id, type, card) {
-        var p = game.players[id];
-        setMsg("电脑" + (type==='PENG'?"碰":"杠"));
-        if(type==='PENG') {
-            remove(p.hand, card, 2);
-            p.melds.push({val:card, type:'peng'});
-            game.turn = id;
-            game.hasDrawn = true;
-            document.getElementById('big-card').innerHTML = ''; 
-            setTimeout(function(){
-                // 碰后AI出牌 (简单出牌)
-                var discard = 0; 
-                var dc = p.hand.splice(discard, 1)[0];
-                p.hand.sort(function(a,b){return a-b});
-                game.lastCard = dc; game.lastPlayer = id; game.hasDrawn = false;
-                showBig(dc); render();
-                checkResponse();
-            }, 1000);
-        }
-        else if(type==='GANG') {
-            remove(p.hand, card, 3);
-            p.melds.push({val:card, type:'gang'});
-            game.turn = id;
-            document.getElementById('big-card').innerHTML = '';
-            setTimeout(performDraw, 800);
-        }
-        render();
+
+    function aiAct(id, type, c) {
+        var p = G.ps[id];
+        rem(p.hand, c, (type=='gang'?3:2)); p.meld.push({v:c, t:type});
+        G.turn = id; document.getElementById('big-card').innerHTML='';
+        setMsg("电脑"+(type=='gang'?"杠":"碰")); render();
+        if(type=='gang') setTimeout(drawCard, 800);
+        else setTimeout(function(){
+            var dc = p.hand.splice(0,1)[0]; p.hand.sort(function(a,b){return a-b}); playCard(dc);
+        }, 800);
     }
 
     function nextTurn() {
-        document.getElementById('big-card').innerHTML = '';
-        game.turn = (game.turn + 1) % 3;
-        render();
-        setTimeout(performDraw, 500);
+        document.getElementById('big-card').innerHTML='';
+        G.turn = (G.turn+1)%3; render(); setTimeout(drawCard, 500);
     }
 
-    // 强制出牌（用于亮倒后）
-    function userDiscardForced(idx) {
-        var p = game.players[0];
-        var card = p.hand.splice(idx, 1)[0];
+    function actDiscard() {
+        if(G.sel == -1) return;
+        var p = G.ps[0];
+        if(p.liang && G.sel != p.hand.length-1) { setMsg("亮倒规则：只能打刚摸的牌！"); return; }
+        
+        var c = p.hand.splice(G.sel, 1)[0];
         p.hand.sort(function(a,b){return a-b});
-        hideActions();
-        game.lastCard = card; game.lastPlayer = 0; game.hasDrawn = false;
-        showBig(card); render();
-        setTimeout(function() { checkResponse(); }, 500);
-    }
-
-    function userDiscard() {
-        if(game.selectIdx === -1) return;
-        var p = game.players[0];
-        // 亮倒校验：如果你亮倒了，你选的牌必须是刚摸的那张（最后一张）
-        if(p.isLiang) {
-            // 其实代码里自动处理了，这里是双重保险
-            if(game.selectIdx !== p.hand.length - 1) {
-                setMsg("亮倒后只能打摸到的牌");
-                return;
-            }
-        }
-        userDiscardForced(game.selectIdx);
-    }
-    
-    function userAction(act) {
-        hideActions();
-        document.getElementById('big-card').innerHTML = '';
-        var p = game.players[0];
-        var c = game.lastCard;
-        if(act==='PASS') {
-            // 如果亮倒了，Pass意味着摸到的牌要打出去
-            if(p.isLiang && game.turn === 0) {
-                 userDiscardForced(p.hand.length - 1);
-            } else {
-                 // 响应别人的牌Pass
-                 var from = game.lastPlayer;
-                 game.players[from].river.push(c);
-                 nextTurn();
-            }
-        }
-        else if(act==='PENG') {
-            remove(p.hand, c, 2);
-            p.melds.push({val:c, type:'peng'});
-            game.turn=0; game.hasDrawn=true; game.selectIdx=-1;
-            setMsg("碰！请出牌");
-            document.getElementById('btn-liang').style.display = 'none';
-            render();
-        }
-        else if(act==='GANG') {
-            remove(p.hand, c, 3);
-            p.melds.push({val:c, type:'gang'});
-            game.turn=0; 
-            setMsg("杠！摸一张");
-            performDraw();
-        }
-        else if(act==='HU') {
-            var fan = 1; var desc = "平胡";
-            var has4 = p.hand.indexOf(c-1) > -1;
-            var has6 = p.hand.indexOf(c+1) > -1;
-            if((c===4||c===13) && has4 && has6) { fan=2; desc="卡五星"; }
-            if(p.isLiang) { fan *= 2; desc += " + 亮倒"; }
-            if(game.lastPlayer !== 0 && game.lastPlayer !== -1) { desc += " (捉炮)"; }
-            showResult(true, "胡牌啦", 2000*fan, desc);
-        }
-    }
-    
-    function userLiang() {
-        var p = game.players[0];
-        p.isLiang = true;
-        document.getElementById('my-liang-tag').style.display = 'inline-block';
-        document.getElementById('btn-liang').style.display = 'none';
-        setMsg("已亮倒！下回合起自动摸打");
-    }
-
-    function onTileClick(idx, isNew) {
-        if(game.turn!==0 || !game.hasDrawn) return;
-        var p = game.players[0];
-        var realIdx = isNew ? p.hand.length-1 : idx;
         
-        // 亮倒后只能点最后一张
-        if(p.isLiang && realIdx !== p.hand.length - 1) return;
-
-        if(game.selectIdx === realIdx) {
-            userDiscard();
-        } else {
-            game.selectIdx = realIdx;
-            render();
-            document.getElementById('btn-out').style.display='block';
+        // 如果是从actLiang来的，这里确认亮倒
+        if(G.pendingLiang) {
+            p.liang = true;
+            G.pendingLiang = false;
+            // 计算打出这张牌后听什么，并显示
+            p.ting = getWinTiles(p.hand, p.meld); 
         }
+        
+        hideActs(); playCard(c);
+    }
+    
+    function actLiang() {
+        // 点击亮倒后，不立即亮，而是标记“正在亮倒”，让用户选一张牌打出去
+        G.pendingLiang = true;
+        setMsg("请打出一张牌以亮倒");
+        hideActs();
+        document.getElementById('btn-out').style.display='block';
+    }
+    
+    function actGangSelf() {
+        var p = G.ps[0]; var g = G.gangInfo;
+        if(g.type=='an') { rem(p.hand, g.v, 4); p.meld.push({v:g.v, t:'gang'}); }
+        else { rem(p.hand, g.v, 1); for(var i=0;i<p.meld.length;i++) if(p.meld[i].v==g.v) p.meld[i].t='gang'; }
+        G.gangInfo=null; hideActs(); render(); setTimeout(drawCard, 500);
+    }
+    function doAct(a) {
+        hideActs(); document.getElementById('big-card').innerHTML='';
+        var p = G.ps[0]; var c = G.last;
+        if(a=='PASS') {
+            if(p.liang && G.turn==0) { var dc = p.hand.pop(); p.hand.sort(function(a,b){return a-b}); playCard(dc); } 
+            else { G.ps[G.from].river.push(c); nextTurn(); }
+        }
+        else if(a=='HU') { 
+            var score = 1000; if(p.liang) score *= 2; 
+            if((c==4||c==13) && p.hand.indexOf(c-1)>-1 && p.hand.indexOf(c+1)>-1) score *= 2;
+            showResult(true, "胡牌啦", score, p.liang?"亮倒":"平胡"); 
+        }
+        else if(a=='PENG') { rem(p.hand,c,2); p.meld.push({v:c,t:'peng'}); G.turn=0; G.drawn=true; G.sel=-1; setMsg("碰，请出牌"); document.getElementById('btn-liang').style.display='none'; render(); }
+        else if(a=='GANG') { rem(p.hand,c,3); p.meld.push({v:c,t:'gang'}); G.turn=0; setMsg("杠，摸一张"); setTimeout(drawCard,500); }
     }
 
-    // --- 算法 ---
-    function checkWin(hand, melds) {
-        var tiles = hand.slice(); 
-        if(melds.length===0 && tiles.length===14 && check7(tiles)) return true;
-        var counts = {}; 
-        for(var i=0;i<tiles.length;i++) counts[tiles[i]] = (counts[tiles[i]]||0)+1;
-        var pairs = [];
-        for(var k in counts) if(counts[k]>=2) pairs.push(parseInt(k));
-        for(var i=0; i<pairs.length; i++) {
-            var p = pairs[i];
-            var copy = tiles.slice();
-            remove(copy, p, 2);
-            if(checkSets(copy)) return true;
+    function clk(idx) {
+        if(G.turn!=0 || !G.drawn) return;
+        var p = G.ps[0];
+        if(p.liang && idx !== p.hand.length - 1) { setMsg("亮倒后只能操作新摸的牌"); return; }
+        var realIdx = (p.liang || (G.turn==0&&G.drawn)) && idx == p.hand.length-1 ? idx : idx;
+        if(G.sel == realIdx) actDiscard();
+        else { G.sel = realIdx; render(); document.getElementById('btn-out').style.display='block'; }
+    }
+
+    // 修复后的算法：严格检查剩余张数，防止误判
+    function checkWin(h, m) {
+        if(m.length==0 && h.length==14 && is7(h)) return true;
+        var c={}; for(var i=0;i<h.length;i++) c[h[i]]=(c[h[i]]||0)+1;
+        var pair=[]; for(var k in c) if(c[k]>=2) pair.push(parseInt(k));
+        for(var i=0;i<pair.length;i++) { 
+            var cp = h.slice(); 
+            // 严格移除一对
+            if(removeOne(cp, pair[i]) && removeOne(cp, pair[i])) {
+                if(isHu(cp)) return true;
+            }
         }
         return false;
     }
-    function check7(t){ for(var i=0;i<14;i+=2) if(t[i]!==t[i+1]) return false; return true; }
-    function checkSets(t){
-        if(t.length===0) return true;
+    function is7(h){ for(var i=0;i<14;i+=2) if(h[i]!=h[i+1]) return false; return true; }
+    
+    // 递归检查胡牌 (修复版)
+    function isHu(t) {
+        if(t.length==0) return true;
         var f=t[0];
-        var countF = 0; for(var i=0;i<t.length;i++) if(t[i]===f) countF++;
-        if(countF>=3) {
-            var c=t.slice(); remove(c,f,3);
-            if(checkSets(c)) return true;
+        
+        // 刻子检查
+        var cnt=0; for(var i=0;i<t.length;i++) if(t[i]==f) cnt++;
+        if(cnt>=3) { 
+            var cp=t.slice(); 
+            if(removeOne(cp,f) && removeOne(cp,f) && removeOne(cp,f)) {
+                if(isHu(cp)) return true; 
+            }
         }
+        
+        // 顺子检查
         if(f<18) {
-            var hasP1 = t.indexOf(f+1) > -1;
-            var hasP2 = t.indexOf(f+2) > -1;
-            if(hasP1 && hasP2) {
-                 if(Math.floor(f/9)===Math.floor((f+2)/9)) {
-                     var c=t.slice(); remove(c,f,1); remove(c,f+1,1); remove(c,f+2,1);
-                     if(checkSets(c)) return true;
-                 }
+            if(t.indexOf(f+1)>-1 && t.indexOf(f+2)>-1) {
+                // 跨花色检查
+                if(Math.floor(f/9) == Math.floor((f+2)/9)) {
+                    var cp=t.slice(); 
+                    if(removeOne(cp,f) && removeOne(cp,f+1) && removeOne(cp,f+2)) {
+                        if(isHu(cp)) return true;
+                    }
+                }
             }
         }
         return false;
     }
-    function remove(arr, v, n){ for(var i=0;i<n;i++){ var idx=arr.indexOf(v); if(idx>-1) arr.splice(idx,1); } }
+    
+    // 工具：精确移除一个元素
+    function removeOne(arr, v) {
+        var idx = arr.indexOf(v);
+        if(idx > -1) { arr.splice(idx, 1); return true; }
+        return false;
+    }
+    
+    // 旧的rem函数改为批量移除
+    function rem(a,v,n) { for(var i=0;i<n;i++) removeOne(a, v); }
+    
+    function checkGang(p) {
+        var c={}; for(var i=0;i<p.hand.length;i++) c[p.hand[i]]=(c[p.hand[i]]||0)+1;
+        for(var k in c) if(c[k]==4) return {type:'an', v:parseInt(k)};
+        for(var i=0;i<p.hand.length;i++) for(var m=0;m<p.meld.length;m++) if(p.meld[m].t=='peng' && p.meld[m].v==p.hand[i]) return {type:'bu', v:p.hand[i]};
+        return null;
+    }
 
+    // 渲染
     function render() {
-        document.getElementById('my-score').innerText = game.players[0].score;
-        renderAi(1, 'p1-hand-area', 'p1-liang-tag', 'p1-melds', 'p1-ting-box', 'p1-ting-tiles');
-        renderAi(2, 'p2-hand-area', 'p2-liang-tag', 'p2-melds', 'p2-ting-box', 'p2-ting-tiles');
-        renderRiver('p1-river', game.players[1].river);
-        renderRiver('p2-river', game.players[2].river);
-        renderRiver('my-river', game.players[0].river);
-        
-        var p = game.players[0];
-        var handDiv = document.getElementById('my-hand');
-        var newDiv = document.getElementById('my-new');
-        var meldDiv = document.getElementById('my-melds');
-        handDiv.innerHTML=''; newDiv.innerHTML=''; meldDiv.innerHTML='';
-        
-        for(var i=0; i<p.melds.length; i++) {
-            var m = p.melds[i];
-            var g=document.createElement('div'); g.className='meld-group';
-            var count = m.type==='gang'?4:3;
-            for(var k=0;k<count;k++) g.appendChild(createTile(m.val, 'meld'));
-            meldDiv.appendChild(g);
+        document.getElementById('score').innerText = G.ps[0].score;
+        renderP(0, 'melds-0', 'hand-0', 'river-0', 'tag-0', 'ting-box-0', 'ting-tiles-0');
+        renderP(1, 'melds-1', 'hand-1', 'river-1', 'tag-1', 'ting-box-1', 'ting-tiles-1');
+        renderP(2, 'melds-2', 'hand-2', 'river-2', 'tag-2', 'ting-box-2', 'ting-tiles-2');
+    }
+    function renderP(id, mId, hId, rId, tagId, tBoxId, tTilesId) {
+        var p = G.ps[id];
+        var mH=""; for(var i=0;i<p.meld.length;i++) {
+            var n=p.meld[i].t=='gang'?4:3; for(var k=0;k<n;k++) mH+=div(p.meld[i].v, 'tile-meld');
+            mH+='<div style="width:5px"></div>';
         }
+        document.getElementById(mId).innerHTML = mH;
+        var rH=""; for(var i=0;i<p.river.length;i++) rH+=div(p.river[i], 'tile-dropped');
+        document.getElementById(rId).innerHTML = rH;
         
-        var len = p.hand.length;
-        if(game.turn===0 && game.hasDrawn) len--;
+        if(tagId) document.getElementById(tagId).style.display = p.liang?'inline-block':'none';
         
-        for(var i=0;i<len;i++) {
-            var t = createTile(p.hand[i], 'normal');
-            if(i===game.selectIdx) t.className += ' selected';
-            (function(idx){ t.onclick = function(){onTileClick(idx,false)}; })(i);
-            handDiv.appendChild(t);
-        }
-        if(game.turn===0 && game.hasDrawn) {
-            var idx = p.hand.length-1;
-            var t = createTile(p.hand[idx], 'normal');
-            if(idx===game.selectIdx) t.className += ' selected';
-            t.onclick = function(){onTileClick(idx,true)};
-            newDiv.appendChild(t);
-        }
+        var tEl = document.getElementById(tBoxId);
+        if(p.liang || (id==0 && p.liang)) {
+            var tings = p.ting.length>0 ? p.ting : (id==0 && p.liang ? getWinTiles(p.hand, p.meld) : []);
+            if(tings.length>0) {
+                tEl.style.display='flex';
+                var tH=""; for(var w=0;w<tings.length;w++) tH+=div(tings[w], 'tile-tiny');
+                document.getElementById(tTilesId).innerHTML = tH;
+            } else tEl.style.display='none';
+        } else tEl.style.display='none';
+
+        var hEl = document.getElementById(hId);
+        if(id==0 || p.liang) {
+            hEl.className = id==0?'my-hand':'opp-hand-open';
+            var hH=""; var len = p.hand.length - (id==0&&G.turn==0&&G.drawn ? 1 : 0);
+            for(var i=0;i<len;i++) hH+=divClick(p.hand[i], i==G.sel, i, id!=0);
+            if(id==0&&G.turn==0&&G.drawn) hH+='<div style="width:15px"></div>'+divClick(p.hand[p.hand.length-1], (p.hand.length-1)==G.sel, p.hand.length-1, false);
+            hEl.innerHTML = hH;
+        } else { hEl.className = 'opp-hand'; hEl.innerHTML = "剩"+p.hand.length+"张"; }
     }
     
-    function renderAi(id, elId, tagId, meldId, tingBoxId, tingTilesId) {
-        var el = document.getElementById(elId);
-        var tag = document.getElementById(tagId);
-        var mEl = document.getElementById(meldId);
-        var tBox = document.getElementById(tingBoxId);
-        var tTiles = document.getElementById(tingTilesId);
-        var p = game.players[id];
-        
-        mEl.innerHTML = '';
-        for(var i=0; i<p.melds.length; i++) {
-             var m = p.melds[i];
-             var g=document.createElement('div'); g.className='meld-group';
-             var count = m.type==='gang'?4:3;
-             for(var k=0;k<count;k++) g.appendChild(createTile(m.val, 'meld'));
-             mEl.appendChild(g);
-        }
-
-        if(p.isLiang) {
-            tag.style.display = 'inline-block';
-            el.innerHTML = '';
-            el.className = 'opp-hand opp-hand-open';
-            for(var i=0; i<p.hand.length; i++) {
-                var t = createTile(p.hand[i], 'normal');
-                t.className += ' tile-small-face';
-                el.appendChild(t);
-            }
-            // 显示胡什么
-            tBox.style.display = 'flex';
-            tTiles.innerHTML = '';
-            for(var i=0; i<p.tingList.length; i++) {
-                var tiny = createTile(p.tingList[i], 'tiny');
-                tTiles.appendChild(tiny);
-            }
-        } else {
-            tag.style.display = 'none';
-            tBox.style.display = 'none';
-            el.className = 'opp-hand';
-            el.innerText = "剩" + p.hand.length + "张";
+    function div(v, cls) { return '<div class="tile '+cls+'"><div class="tile-face">'+getSvg(v)+'</div></div>'; }
+    function divClick(v, sel, idx, isSmall) { return '<div class="tile '+(sel?'selected':'')+' '+(isSmall?'tile-small':'')+'" onclick="clk('+idx+')"><div class="tile-face">'+getSvg(v)+'</div></div>'; }
+    function hideActs() { 
+        var box=document.getElementById('btn-box'); box.innerHTML=''; 
+        box.innerHTML='<button class="btn btn-liang" id="btn-liang" onclick="actLiang()">亮倒</button><button class="btn btn-gang" id="btn-gang-self" style="display:none" onclick="actGangSelf()">杠</button><button class="btn btn-out" id="btn-out" onclick="actDiscard()">出牌</button>';
+    }
+    function showActs(list) {
+        var box = document.getElementById('btn-box'); box.innerHTML='';
+        for(var i=0;i<list.length;i++) {
+            (function(a){
+                var b=document.createElement('button');
+                b.className='btn btn-'+a.toLowerCase();
+                b.innerText = (a=='HU'?"胡":(a=='PENG'?"碰":(a=='GANG'?"杠":(a=='PASS'?"过":""))));
+                if(a=='PASS' && G.ps[0].liang) { b.innerText="打出"; b.className+=' btn-pass'; }
+                b.onclick=function(){doAct(a)}; box.appendChild(b);
+            })(list[i]);
         }
     }
-    
-    function renderRiver(id, river) {
-        var d = document.getElementById(id); d.innerHTML='';
-        for(var i=0; i<river.length; i++) d.appendChild(createTile(river[i], 'dropped'));
-    }
-    function createTile(val, type) {
-        var div = document.createElement('div');
-        div.className = 'tile';
-        if(type==='dropped') div.className += ' tile-dropped';
-        if(type==='meld') div.className += ' tile-meld';
-        if(type==='big') div.className += ' tile-big';
-        if(type==='tiny') div.className += ' tile-tiny';
-        var face = document.createElement('div');
-        face.className = 'tile-face';
-        face.innerHTML = getSvg(val);
-        div.appendChild(face);
-        return div;
-    }
-    function showBig(val) {
-        var b = document.getElementById('big-card'); b.innerHTML='';
-        b.appendChild(createTile(val, 'big'));
-    }
-    function showActions(acts) {
-        var g = document.getElementById('btn-group'); g.innerHTML='';
-        var bo = document.createElement('button'); bo.className='btn btn-out'; bo.id='btn-out'; bo.innerText='出牌'; bo.onclick=userDiscard; g.appendChild(bo);
-        
-        // 只有亮倒后自摸时，PASS显示为"打出"
-        var isLiangPass = game.players[0].isLiang && acts.indexOf('HU') > -1;
-
-        for(var i=0; i<acts.length; i++) {
-            (function(act){
-                var b=document.createElement('button'); b.className='btn';
-                if(act==='HU') { b.innerText="胡牌"; b.className+=' btn-hu';}
-                if(act==='PENG') { b.innerText="碰"; b.className+=' btn-peng';}
-                if(act==='GANG') { b.innerText="杠"; b.className+=' btn-gang';}
-                if(act==='PASS') { 
-                    b.innerText = isLiangPass ? "打出" : "过"; 
-                    b.className+=' btn-pass';
-                }
-                b.onclick = function(){ userAction(act); };
-                g.appendChild(b);
-            })(acts[i]);
-        }
-    }
-    function hideActions() {
-         var g = document.getElementById('btn-group'); g.innerHTML='';
-         var bl = document.createElement('button'); bl.className='btn btn-liang'; bl.id='btn-liang'; bl.innerText='亮倒'; bl.onclick=userLiang; g.appendChild(bl);
-         var bg = document.createElement('button'); bg.className='btn btn-gang'; bg.id='btn-self-gang'; bg.innerText='杠'; bg.onclick=userSelfGang; g.appendChild(bg);
-         var bo = document.createElement('button'); bo.className='btn btn-out'; bo.id='btn-out'; bo.innerText='出牌'; bo.onclick=userDiscard; g.appendChild(bo);
-         bl.style.display = 'none';
-         bg.style.display = 'none';
-    }
+    function setMsg(t) { document.getElementById('msg').innerText=t; }
+    function updateScoreUI() { document.getElementById('score').innerText = G.ps[0].score; }
     function showResult(win, title, score, desc) {
         var m = document.getElementById('modal'); m.style.display='flex';
         document.getElementById('res-title').innerText = title;
         document.getElementById('res-desc').innerText = desc;
         var s = document.getElementById('res-score');
-        s.innerText = (score>0?"+":"")+score;
-        s.style.color = score>0?"#d32f2f":"#388e3c";
-        game.players[0].score += score;
-        document.getElementById('my-score').innerText=game.players[0].score;
+        s.innerText = (score>0?"+":"")+score; s.style.color = score>0?"#d32f2f":"#388e3c";
+        G.ps[0].score += score; updateScoreUI();
     }
-    function setMsg(txt) { document.getElementById('msg-text').innerText = txt; }
+    function showBig(v) { document.getElementById('big-card').innerHTML = div(v, 'tile-big'); }
+    if(window.plus){plusReady();}else{document.addEventListener('plusready',plusReady,false);}
+    function plusReady(){plus.navigator.closeSplashscreen();plus.screen.lockOrientation("portrait-primary");}
 </script>
 </body>
 </html>
