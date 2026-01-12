@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-    <title>单机卡五星</title>
+    <title>奶奶的卡五星 (规则完善版)</title>
     <style>
         /* --- 1. 全局设置 --- */
         html, body {
@@ -141,7 +141,7 @@
     </div>
 
     <div id="lobby-layer" style="display:none;">
-        <div class="lobby-title">🀄️ 单机卡五星🀄️ </div>
+        <div class="lobby-title">🀄️ 单机卡五星 (定制版)</div>
         <div class="lobby-info">您的金豆: <span id="user-score-disp-1">读取中...</span></div>
         <div class="room-container">
             <div class="room-btn bg-green" onclick="enterRoom(0)"><div class="room-name">🟢 初级场</div><div class="room-desc">底分100</div></div>
@@ -209,8 +209,6 @@
 <script>
     // --- 0. 音量 & 随机语音系统 ---
     var VOL_BGM = 0.3; var VOL_VOICE = 1.0; var VOL_SFX = 0.8;
-    
-    // 是否正在游戏中的标志（控制BGM只在游戏里响）
     var IN_GAME = false;
 
     var clickSounds = [
@@ -246,7 +244,6 @@
             var bgm = document.getElementById('bgm-player'); 
             if(bgm) {
                 bgm.volume = VOL_BGM;
-                // 如果在游戏里，且因为音量0而暂停了，现在调大了就继续播
                 if(IN_GAME && bgm.paused && VOL_BGM > 0) bgm.play().catch(e=>{});
             }
             localStorage.setItem('nainai_vol_bgm', v); 
@@ -276,61 +273,24 @@
         if (voiceSounds[key]) playRandom(voiceSounds[key], vol);
     }
 
-    // --- BGM 控制中心 ---
-    function playBGM() {
-        var bgm = document.getElementById('bgm-player');
-        if(bgm && VOL_BGM > 0) {
-            bgm.volume = VOL_BGM;
-            bgm.play().catch(e => {});
-        }
-    }
-    
-    function pauseBGM() {
-        var bgm = document.getElementById('bgm-player');
-        if(bgm) bgm.pause();
-    }
+    function playBGM() { var bgm = document.getElementById('bgm-player'); if(bgm && VOL_BGM > 0) { bgm.volume = VOL_BGM; bgm.play().catch(e => {}); } }
+    function pauseBGM() { var bgm = document.getElementById('bgm-player'); if(bgm) bgm.pause(); }
 
-    // --- 启动入口 ---
     function initApp() { 
         loadData(); loadVolume(); 
         safeStyle('start-layer', 'display', 'none'); 
         initLobby(); 
-        // 初始不播放 BGM (大厅保持安静)
     }
 
-    // --- 1. 混合视觉系统 ---
-    function getFileName(v) {
-        if (v >= 0 && v <= 8) return "Pin" + (v + 1) + ".svg";
-        if (v >= 9 && v <= 17) return "Sou" + (v - 9 + 1) + ".svg";
-        if (v === 18) return "Chun.svg"; if (v === 19) return "Hatsu.svg"; return "";
-    }
-    function div(v, cls) {
-        if (v === 20) return '<div class="tile ' + cls + '"><div class="bai-ban"></div></div>';
-        return '<div class="tile ' + cls + '"><img src="img/tiles/' + getFileName(v) + '" style="width:100%; height:100%; object-fit:contain; pointer-events:none;"></div>';
-    }
-    function divClick(v, sel, idx, isSmall) {
-        var content = (v === 20) ? '<div class="bai-ban"></div>' : '<img src="img/tiles/' + getFileName(v) + '" style="width:100%; height:100%; object-fit:contain; pointer-events:none;">';
-        return '<div class="tile ' + (sel ? 'selected' : '') + ' ' + (isSmall ? 'tile-small' : '') + '" onclick="clk(' + idx + ')">' + content + '</div>';
-    }
-
-    // --- 2. 基础逻辑 ---
+    // --- 视觉与逻辑 ---
+    function getFileName(v) { if (v >= 0 && v <= 8) return "Pin" + (v + 1) + ".svg"; if (v >= 9 && v <= 17) return "Sou" + (v - 9 + 1) + ".svg"; if (v === 18) return "Chun.svg"; if (v === 19) return "Hatsu.svg"; return ""; }
+    function div(v, cls) { if (v === 20) return '<div class="tile ' + cls + '"><div class="bai-ban"></div></div>'; return '<div class="tile ' + cls + '"><img src="img/tiles/' + getFileName(v) + '" style="width:100%; height:100%; object-fit:contain; pointer-events:none;"></div>'; }
+    function divClick(v, sel, idx, isSmall) { var content = (v === 20) ? '<div class="bai-ban"></div>' : '<img src="img/tiles/' + getFileName(v) + '" style="width:100%; height:100%; object-fit:contain; pointer-events:none;">'; return '<div class="tile ' + (sel ? 'selected' : '') + ' ' + (isSmall ? 'tile-small' : '') + '" onclick="clk(' + idx + ')">' + content + '</div>'; }
     function safeStyle(id, prop, val) { var el = document.getElementById(id); if (el) el.style[prop] = val; }
     function safeHtml(id, html) { var el = document.getElementById(id); if (el) el.innerHTML = html; }
     function setMsg(t) { var el = document.getElementById('msg'); if(el) el.innerText = t; }
-    
     function hideActs() { safeHtml('btn-box', ''); }
-    function showActs(list, showBase) {
-        var box = document.getElementById('btn-box'); if(!box) return; box.innerHTML='';
-        if(showBase) { var btn = document.createElement('button'); btn.className = 'btn btn-out'; btn.id = 'btn-out'; btn.innerText = '出牌'; btn.onclick = actDiscard; btn.style.display = 'block'; box.appendChild(btn); }
-        for(var i=0;i<list.length;i++) {
-            (function(a){
-                var b=document.createElement('button'); b.className='btn btn-'+a.toLowerCase();
-                b.innerText = (a=='HU'?"胡":(a=='PENG'?"碰":(a=='GANG'?"杠":(a=='PASS'?"过":(a=='LIANG'?"亮倒":"")))));
-                if(a=='PASS' && G.ps[0].liang) { b.innerText="打出"; b.className+=' btn-pass'; }
-                b.onclick=function(){doAct(a)}; box.appendChild(b);
-            })(list[i]);
-        }
-    }
+    function showActs(list, showBase) { var box = document.getElementById('btn-box'); if(!box) return; box.innerHTML=''; if(showBase) { var btn = document.createElement('button'); btn.className = 'btn btn-out'; btn.id = 'btn-out'; btn.innerText = '出牌'; btn.onclick = actDiscard; btn.style.display = 'block'; box.appendChild(btn); } for(var i=0;i<list.length;i++) { (function(a){ var b=document.createElement('button'); b.className='btn btn-'+a.toLowerCase(); b.innerText = (a=='HU'?"胡":(a=='PENG'?"碰":(a=='GANG'?"杠":(a=='PASS'?"过":(a=='LIANG'?"亮倒":""))))); if(a=='PASS' && G.ps[0].liang) { b.innerText="打出"; b.className+=' btn-pass'; } b.onclick=function(){doAct(a)}; box.appendChild(b); })(list[i]); } }
 
     var ROOMS = [ {name:"初级场", min:0, base:100, ai:0}, {name:"中级场", min:10000, base:500, ai:1}, {name:"高级场", min:50000, base:2000, ai:2} ];
     var SCORE = 100000;
@@ -339,49 +299,33 @@
     var CUR_ROOM = null;
     var G = { deck:[], ps:[], turn:0, last:-1, from:-1, sel:-1, drawn:false, gangInfo:null, pendingLiang:false };
 
-    function showAbout() { alert("👵 卡五星 v2.0\n\n清爽无广版卡五星！"); }
+    function showAbout() { alert("👵 奶奶的卡五星 v1.8\n\n专为长辈定制的清爽无广版卡五星\n\n祝奶奶身体健康，手气长虹！"); }
     function confirmExit() { if(confirm("确定要退出这局游戏返回大厅吗？")) { backToLobby(); } }
 
-    function initLobby() {
-        IN_GAME = false;
-        pauseBGM(); // 大厅不放BGM
-        safeStyle('lobby-layer', 'display', 'flex'); safeStyle('game-layer', 'display', 'none');
-        safeStyle('modal', 'display', 'none'); safeStyle('hand-viewer', 'display', 'none'); 
-        if(SCORE <= 0) { SCORE = 3000; saveData(); safeStyle('toast', 'display', 'block'); setTimeout(function(){safeStyle('toast', 'display', 'none')}, 2500); }
-        updateGlobalScore(); safeStyle('lock-1', 'display', SCORE < 10000 ? 'flex' : 'none'); safeStyle('lock-2', 'display', SCORE < 50000 ? 'flex' : 'none');
-    }
+    function initLobby() { IN_GAME = false; pauseBGM(); safeStyle('lobby-layer', 'display', 'flex'); safeStyle('game-layer', 'display', 'none'); safeStyle('modal', 'display', 'none'); safeStyle('hand-viewer', 'display', 'none'); if(SCORE <= 0) { SCORE = 3000; saveData(); safeStyle('toast', 'display', 'block'); setTimeout(function(){safeStyle('toast', 'display', 'none')}, 2500); } updateGlobalScore(); safeStyle('lock-1', 'display', SCORE < 10000 ? 'flex' : 'none'); safeStyle('lock-2', 'display', SCORE < 50000 ? 'flex' : 'none'); }
     function updateGlobalScore() { var el1 = document.getElementById('user-score-disp-1'); if(el1) el1.innerText = SCORE; var el2 = document.getElementById('user-score-disp-2'); if(el2) el2.innerText = SCORE; }
-    
-    function enterRoom(id) {
-        var r = ROOMS[id]; if(SCORE < r.min) { alert("金豆不足！"); return; }
-        CUR_ROOM = r; safeStyle('lobby-layer', 'display', 'none'); safeStyle('game-layer', 'display', 'block');
-        var ri = document.getElementById('room-info-disp'); if(ri) ri.innerText = r.name + " (底分"+r.base+")";
-        updateGlobalScore(); startGame();
-    }
+    function enterRoom(id) { var r = ROOMS[id]; if(SCORE < r.min) { alert("金豆不足！"); return; } CUR_ROOM = r; safeStyle('lobby-layer', 'display', 'none'); safeStyle('game-layer', 'display', 'block'); var ri = document.getElementById('room-info-disp'); if(ri) ri.innerText = r.name + " (底分"+r.base+")"; updateGlobalScore(); startGame(); }
     function backToLobby() { initLobby(); }
 
-    function startGame() {
-        IN_GAME = true;
-        playBGM(); // 进游戏才开始放
-        hideActs(); safeHtml('big-card', ''); 
-        G.deck=[]; for(var i=0;i<=20;i++) for(var k=0;k<4;k++) G.deck.push(i);
-        for(var i=G.deck.length-1;i>0;i--) { var j=Math.floor(Math.random()*(i+1)); var t=G.deck[i]; G.deck[i]=G.deck[j]; G.deck[j]=t; }
-        G.ps = [];
-        for(var i=0;i<3;i++) {
-            var s = (i==0 ? SCORE : 100000); var h=[]; for(var k=0;k<13;k++) h.push(G.deck.pop()); h.sort(function(a,b){return a-b});
-            G.ps.push({ hand:h, meld:[], river:[], liang:false, ting:[], score:s });
-        }
-        G.turn = 0; G.drawn = false; G.sel = -1; G.pendingLiang = false;
-        var r = document.getElementById('river-0'); var b = document.getElementById('river-toggle-btn');
-        if(r) r.className = 'my-river'; if(b) b.innerText = '🔽 收起弃牌';
-        render(); setMsg("庄家摸牌..."); setTimeout(drawCard, 800);
-    }
+    function startGame() { IN_GAME = true; playBGM(); hideActs(); safeHtml('big-card', ''); G.deck=[]; for(var i=0;i<=20;i++) for(var k=0;k<4;k++) G.deck.push(i); for(var i=G.deck.length-1;i>0;i--) { var j=Math.floor(Math.random()*(i+1)); var t=G.deck[i]; G.deck[i]=G.deck[j]; G.deck[j]=t; } G.ps = []; for(var i=0;i<3;i++) { var s = (i==0 ? SCORE : 100000); var h=[]; for(var k=0;k<13;k++) h.push(G.deck.pop()); h.sort(function(a,b){return a-b}); G.ps.push({ hand:h, meld:[], river:[], liang:false, ting:[], score:s }); } G.turn = 0; G.drawn = false; G.sel = -1; G.pendingLiang = false; var r = document.getElementById('river-0'); var b = document.getElementById('river-toggle-btn'); if(r) r.className = 'my-river'; if(b) b.innerText = '🔽 收起弃牌'; render(); setMsg("庄家摸牌..."); setTimeout(drawCard, 800); }
 
+    // --- 核心修改：移除 p.liang 的判断，允许亮倒后检测操作 ---
     function checkAvailableActs(p) {
+        // [修改] 不再判断 if(p.liang) return; 而是允许检测
         showActs([], true);
-        var acts = []; var canLiang = checkCanLiang(p.hand, p.meld); var gangInfo = checkGang(p);
-        if(canLiang) acts.push('LIANG'); if(gangInfo) { G.gangInfo = gangInfo; acts.push('GANG'); }
-        if(acts.length > 0) { showActs(acts, true); if(!canLiang && gangInfo) setMsg("有杠"); else setMsg("请选择操作"); } else setMsg("请出牌");
+        var acts = []; 
+        var canLiang = !p.liang && checkCanLiang(p.hand, p.meld); // 没亮倒才能亮
+        var gangInfo = checkGang(p);
+        
+        if(canLiang) acts.push('LIANG'); 
+        if(gangInfo) { G.gangInfo = gangInfo; acts.push('GANG'); }
+        
+        if(acts.length > 0) { 
+            showActs(acts, true); 
+            if(gangInfo) setMsg(p.liang ? "亮倒后杠牌" : "有杠"); 
+            else setMsg("请选择操作"); 
+        } 
+        else setMsg(p.liang ? "亮倒：请打出牌" : "请出牌");
     }
 
     function drawCard() {
@@ -389,132 +333,65 @@
             if(G.deck.length==0) { alert("流局"); backToLobby(); return; }
             var p = G.ps[G.turn]; var c = G.deck.pop(); p.hand.push(c);
             if(G.turn == 0) { 
-                G.drawn = true; G.sel = -1; 
-                safeHtml('big-card', ''); 
-                render();
+                G.drawn = true; G.sel = -1; safeHtml('big-card', ''); render();
+                
+                // [修改] 亮倒后逻辑更新：允许胡、杠检查
                 if(p.liang) {
-                    setMsg("已亮倒：自动打牌");
-                    if(checkWin(p.hand, p.meld)) { 
-                        showActs(['HU','PASS']); setMsg("亮倒自摸！"); 
-                        playSound('hu'); 
+                    setMsg("已亮倒");
+                    // 1. 检查自摸
+                    if(checkWin(p.hand, p.meld)) { showActs(['HU','PASS']); setMsg("亮倒自摸！"); playSound('hu'); return; }
+                    // 2. 检查暗杠/补杠
+                    var gangInfo = checkGang(p);
+                    if(gangInfo) {
+                        G.gangInfo = gangInfo;
+                        showActs(['GANG','PASS']); // 这里PASS就是打出这张牌
+                        setMsg("亮倒后有杠");
+                        return;
                     }
-                    else { setTimeout(function(){ actDiscardForce(p.hand.length-1); }, 1000); }
-                    return;
+                    // 3. 如果没操作，自动打牌 (延时一下让老人家看清摸了啥)
+                    setTimeout(function(){ actDiscardForce(p.hand.length-1); }, 800);
+                } else {
+                    if(checkWin(p.hand, p.meld)) { showActs(['HU','PASS']); setMsg("摸到好牌！"); playSound('hu'); }
+                    else { checkAvailableActs(p); }
                 }
-                if(checkWin(p.hand, p.meld)) { 
-                    showActs(['HU','PASS']); setMsg("摸到好牌！"); 
-                    playSound('hu');
-                }
-                else { checkAvailableActs(p); }
             } else { render(); setMsg((G.turn==1?"下家":"上家")+"思考中..."); setTimeout(function(){ aiPlay(p); }, 800); }
         } catch(e) {}
     }
-
-    function aiPlay(p) {
-        try {
-            if(checkWin(p.hand, p.meld)) { 
-                playSound('hu'); 
-                showResult(G.turn, "电脑胡了", 0, "自摸", true); return; 
-            }
-            if(!p.liang && CUR_ROOM.ai > 0) {
-                for(var i=0; i<p.hand.length; i++) {
-                    var tmp = p.hand.slice(); var dc = tmp.splice(i,1)[0]; var tings = getWinTiles(tmp, p.meld);
-                    if(tings.length>0 && Math.random() < (CUR_ROOM.ai==2?0.9:0.6)) {
-                        p.liang=true; p.ting=tings; p.hand=tmp; G.last = dc; G.from = G.turn; G.drawn = false;
-                        showBig(dc); render(); playClick(); 
-                        playSound('liang'); 
-                        checkResp(); return;
-                    }
-                }
-            }
-            if(p.liang) { var c = p.hand.pop(); playCard(c); return; }
-            var danger = (G.ps[0].liang && CUR_ROOM.ai==2) ? G.ps[0].ting : [];
-            var counts={}; for(var i=0;i<p.hand.length;i++) counts[p.hand[i]]=(counts[p.hand[i]]||0)+1;
-            var best = -1;
-            for(var i=0; i<p.hand.length; i++) {
-                var t = p.hand[i];
-                if(danger.indexOf(t)==-1) { if(counts[t]==1) { if(t>=18) { best=i; break; } if(best==-1) best=i; } }
-            }
-            if(best==-1) best = Math.floor(Math.random()*p.hand.length);
-            var c = p.hand.splice(best, 1)[0]; p.hand.sort(function(a,b){return a-b}); playCard(c);
-        } catch(e) {}
-    }
-    function playCard(c) { G.last = c; G.from = G.turn; G.drawn = false; playClick(); showBig(c); render(); checkResp(); }
 
     function checkResp() {
         var c = G.last;
         if(G.from != 0) {
             var p = G.ps[0]; var acts = []; var tmp = p.hand.slice(); tmp.push(c); tmp.sort(function(a,b){return a-b});
+            // 1. 检查胡
             if(checkWin(tmp, p.meld)) acts.push('HU');
-            if(!p.liang) { var cnt=0; for(var i=0;i<p.hand.length;i++) if(p.hand[i]==c) cnt++; if(cnt>=2) acts.push('PENG'); if(cnt==3) acts.push('GANG'); }
+            
+            // 2. 检查杠碰 (即使亮倒也检查，如果你想完全禁止亮倒后碰，可以在这里加 !p.liang 判断)
+            // 这里为了满足“可以操作”，我们允许检测
+            var cnt=0; for(var i=0;i<p.hand.length;i++) if(p.hand[i]==c) cnt++; 
+            
+            // [规则] 亮倒后通常不能碰，只能杠。这里如果想严格点：if(!p.liang && cnt>=2)
+            // 但根据你的需求，我们开放检测
+            if(cnt>=2) acts.push('PENG'); 
+            if(cnt==3) acts.push('GANG');
+            
             if(acts.length>0) { acts.push('PASS'); showActs(acts); setMsg("有操作"); playSound('select'); return; }
         }
         var n1 = (G.from+1)%3; if(aiResp(n1, c)) return; var n2 = (G.from+2)%3; if(aiResp(n2, c)) return;
         G.ps[G.from].river.push(c); nextTurn();
     }
 
-    function aiResp(id, c) {
-        if(id==0 || id==G.from) return false;
-        var p = G.ps[id]; var tmp = p.hand.slice(); tmp.push(c); tmp.sort(function(a,b){return a-b});
-        if(checkWin(tmp, p.meld)) { 
-            playSound('hu'); 
-            showResult(id, "电脑胡了", 0, "捉炮", false); return true; 
-        }
-        if(p.liang) return false;
-        var cnt=0; for(var i=0;i<p.hand.length;i++) if(p.hand[i]==c) cnt++; var rate = CUR_ROOM.ai==2 ? 0.9 : 0.5;
-        if(cnt==3) { aiAct(id, 'gang', c); return true; } if(cnt>=2 && Math.random()<rate) { aiAct(id, 'peng', c); return true; }
-        return false;
-    }
-    function aiAct(id, type, c) {
-        var p = G.ps[id]; rem(p.hand, c, (type=='gang'?3:2)); p.meld.push({v:c, t:type});
-        G.turn = id; safeHtml('big-card', ''); setMsg("电脑"+(type=='gang'?"杠":"碰")); render(); 
-        playSound(type); 
-        if(type=='gang') setTimeout(drawCard, 800); else setTimeout(function(){ var dc = p.hand.splice(0,1)[0]; p.hand.sort(function(a,b){return a-b}); playCard(dc); }, 800);
-    }
+    // --- 其他AI逻辑不变 ---
+    function aiPlay(p) { try { if(checkWin(p.hand, p.meld)) { playSound('hu'); showResult(G.turn, "电脑胡了", 0, "自摸", true); return; } if(!p.liang && CUR_ROOM.ai > 0) { for(var i=0; i<p.hand.length; i++) { var tmp = p.hand.slice(); var dc = tmp.splice(i,1)[0]; var tings = getWinTiles(tmp, p.meld); if(tings.length>0 && Math.random() < (CUR_ROOM.ai==2?0.9:0.6)) { p.liang=true; p.ting=tings; p.hand=tmp; G.last = dc; G.from = G.turn; G.drawn = false; showBig(dc); render(); playClick(); playSound('liang'); checkResp(); return; } } } if(p.liang) { var c = p.hand.pop(); playCard(c); return; } var danger = (G.ps[0].liang && CUR_ROOM.ai==2) ? G.ps[0].ting : []; var counts={}; for(var i=0;i<p.hand.length;i++) counts[p.hand[i]]=(counts[p.hand[i]]||0)+1; var best = -1; for(var i=0; i<p.hand.length; i++) { var t = p.hand[i]; if(danger.indexOf(t)==-1) { if(counts[t]==1) { if(t>=18) { best=i; break; } if(best==-1) best=i; } } } if(best==-1) best = Math.floor(Math.random()*p.hand.length); var c = p.hand.splice(best, 1)[0]; p.hand.sort(function(a,b){return a-b}); playCard(c); } catch(e) {} }
+    function playCard(c) { G.last = c; G.from = G.turn; G.drawn = false; playClick(); showBig(c); render(); checkResp(); }
+    function aiResp(id, c) { if(id==0 || id==G.from) return false; var p = G.ps[id]; var tmp = p.hand.slice(); tmp.push(c); tmp.sort(function(a,b){return a-b}); if(checkWin(tmp, p.meld)) { playSound('hu'); showResult(id, "电脑胡了", 0, "捉炮", false); return true; } if(p.liang) return false; var cnt=0; for(var i=0;i<p.hand.length;i++) if(p.hand[i]==c) cnt++; var rate = CUR_ROOM.ai==2 ? 0.9 : 0.5; if(cnt==3) { aiAct(id, 'gang', c); return true; } if(cnt>=2 && Math.random()<rate) { aiAct(id, 'peng', c); return true; } return false; }
+    function aiAct(id, type, c) { var p = G.ps[id]; rem(p.hand, c, (type=='gang'?3:2)); p.meld.push({v:c, t:type}); G.turn = id; safeHtml('big-card', ''); setMsg("电脑"+(type=='gang'?"杠":"碰")); render(); playSound(type); if(type=='gang') setTimeout(drawCard, 800); else setTimeout(function(){ var dc = p.hand.splice(0,1)[0]; p.hand.sort(function(a,b){return a-b}); playCard(dc); }, 800); }
     function nextTurn() { safeHtml('big-card', ''); G.turn = (G.turn+1)%3; render(); setTimeout(drawCard, 500); }
-
-    function actDiscard() {
-        if(G.sel == -1) return; var p = G.ps[0];
-        if(p.liang && G.sel != p.hand.length-1) { setMsg("亮倒规则：只能打新摸的牌"); return; }
-        actDiscardForce(G.sel);
-    }
-    function actDiscardForce(idx) {
-        var p = G.ps[0];
-        if(G.pendingLiang) {
-            var tmpHand = p.hand.slice(); tmpHand.splice(idx, 1); tmpHand.sort(function(a,b){return a-b}); var tings = getWinTiles(tmpHand, p.meld);
-            if(tings.length === 0) { setMsg("打这张牌不听牌，无法亮倒！"); return; }
-            p.liang = true; p.ting = tings; G.pendingLiang = false;
-            safeStyle('ting-box-0', 'display', 'flex'); var tH=""; for(var w=0;w<tings.length;w++) tH+=div(tings[w], 'tile-tiny'); safeHtml('t-tiles-0', tH); 
-            playSound('liang'); 
-        }
-        var c = p.hand.splice(idx, 1)[0]; p.hand.sort(function(a,b){return a-b}); hideActs(); playCard(c);
-    }
-    function actLiang() { 
-        G.pendingLiang = true; setMsg("请打出一张牌以亮倒"); 
-        var box = document.getElementById('btn-box'); if(box) { box.innerHTML = ''; var btn = document.createElement('button'); btn.className = 'btn btn-out'; btn.id = 'btn-out'; btn.innerText = '出牌'; btn.onclick = actDiscard; btn.style.display = 'block'; box.appendChild(btn); }
-    }
-    function actGangSelf() {
-        var p = G.ps[0]; var g = G.gangInfo;
-        if(g.type=='an') { rem(p.hand, g.v, 4); p.meld.push({v:g.v, t:'gang'}); } else { rem(p.hand, g.v, 1); for(var i=0;i<p.meld.length;i++) if(p.meld[i].v==g.v) p.meld[i].t='gang'; }
-        G.gangInfo=null; hideActs(); render(); playSound('gang'); setTimeout(drawCard, 500);
-    }
-    function doAct(a) {
-        hideActs(); safeHtml('big-card', ''); var p = G.ps[0]; var c = G.last;
-        if(a=='PASS') { if(p.liang && G.turn==0) { var dc = p.hand.pop(); p.hand.sort(function(a,b){return a-b}); playCard(dc); } else { G.ps[G.from].river.push(c); nextTurn(); } }
-        else if(a=='HU') { 
-            playSound('hu'); 
-            showResult(0, "胡牌啦", 0, "", G.from==0); 
-        }
-        else if(a=='LIANG') actLiang();
-        else if(a=='GANG') { if(G.turn==0) actGangSelf(); else { rem(p.hand,c,3); p.meld.push({v:c,t:'gang'}); G.turn=0; setMsg("杠，摸一张"); playSound('gang'); setTimeout(drawCard,500); } }
-        else if(a=='PENG') { rem(p.hand,c,2); p.meld.push({v:c,t:'peng'}); G.turn=0; G.drawn=true; G.sel=-1; setMsg("碰，请出牌"); render(); playSound('peng'); checkAvailableActs(p); }
-    }
-    function clk(idx) {
-        if(G.turn!=0 || !G.drawn) return; var p = G.ps[0];
-        if(p.liang && idx!=p.hand.length-1) { setMsg("亮倒后只能操作新摸的牌"); return; }
-        var realIdx = (p.liang || (G.turn==0&&G.drawn)) && idx == p.hand.length-1 ? idx : idx;
-        if(G.sel == realIdx) { actDiscard(); } else { G.sel = realIdx; render(); playSound('select'); checkAvailableActs(p); } 
-    }
+    function actDiscard() { if(G.sel == -1) return; var p = G.ps[0]; if(p.liang && G.sel != p.hand.length-1) { setMsg("亮倒规则：只能打新摸的牌"); return; } actDiscardForce(G.sel); }
+    function actDiscardForce(idx) { var p = G.ps[0]; if(G.pendingLiang) { var tmpHand = p.hand.slice(); tmpHand.splice(idx, 1); tmpHand.sort(function(a,b){return a-b}); var tings = getWinTiles(tmpHand, p.meld); if(tings.length === 0) { setMsg("打这张牌不听牌，无法亮倒！"); return; } p.liang = true; p.ting = tings; G.pendingLiang = false; safeStyle('ting-box-0', 'display', 'flex'); var tH=""; for(var w=0;w<tings.length;w++) tH+=div(tings[w], 'tile-tiny'); safeHtml('t-tiles-0', tH); playSound('liang'); } var c = p.hand.splice(idx, 1)[0]; p.hand.sort(function(a,b){return a-b}); hideActs(); playCard(c); }
+    function actLiang() { G.pendingLiang = true; setMsg("请打出一张牌以亮倒"); var box = document.getElementById('btn-box'); if(box) { box.innerHTML = ''; var btn = document.createElement('button'); btn.className = 'btn btn-out'; btn.id = 'btn-out'; btn.innerText = '出牌'; btn.onclick = actDiscard; btn.style.display = 'block'; box.appendChild(btn); } }
+    function actGangSelf() { var p = G.ps[0]; var g = G.gangInfo; if(g.type=='an') { rem(p.hand, g.v, 4); p.meld.push({v:g.v, t:'gang'}); } else { rem(p.hand, g.v, 1); for(var i=0;i<p.meld.length;i++) if(p.meld[i].v==g.v) p.meld[i].t='gang'; } G.gangInfo=null; hideActs(); render(); playSound('gang'); setTimeout(drawCard, 500); }
+    function doAct(a) { hideActs(); safeHtml('big-card', ''); var p = G.ps[0]; var c = G.last; if(a=='PASS') { if(p.liang && G.turn==0) { var dc = p.hand.pop(); p.hand.sort(function(a,b){return a-b}); playCard(dc); } else { G.ps[G.from].river.push(c); nextTurn(); } } else if(a=='HU') { playSound('hu'); showResult(0, "胡牌啦", 0, "", G.from==0); } else if(a=='LIANG') actLiang(); else if(a=='GANG') { if(G.turn==0) actGangSelf(); else { rem(p.hand,c,3); p.meld.push({v:c,t:'gang'}); G.turn=0; setMsg("杠，摸一张"); playSound('gang'); setTimeout(drawCard,500); } } else if(a=='PENG') { rem(p.hand,c,2); p.meld.push({v:c,t:'peng'}); G.turn=0; G.drawn=true; G.sel=-1; setMsg("碰，请出牌"); render(); playSound('peng'); checkAvailableActs(p); } }
+    function clk(idx) { if(G.turn!=0 || !G.drawn) return; var p = G.ps[0]; if(p.liang && idx!=p.hand.length-1) { setMsg("亮倒后只能操作新摸的牌"); return; } var realIdx = (p.liang || (G.turn==0&&G.drawn)) && idx == p.hand.length-1 ? idx : idx; if(G.sel == realIdx) { actDiscard(); } else { G.sel = realIdx; render(); playSound('select'); checkAvailableActs(p); } }
     function toggleMyRiver() { var r = document.getElementById('river-0'); var b = document.getElementById('river-toggle-btn'); if(!r || !b) return; if (r.classList.contains('collapsed')) { r.classList.remove('collapsed'); b.innerText = '🔽 收起弃牌'; } else { r.classList.add('collapsed'); b.innerText = '🔼 展开弃牌'; } }
     function showOppHand(id) { var p = G.ps[id]; if(!p.liang) { setMsg("对手未亮倒，不可查看"); return; } var vBox = document.getElementById('viewer-content'); if(vBox) { var hH = ""; for(var i=0; i<p.hand.length; i++) hH += div(p.hand[i], 'tile-viewer'); vBox.innerHTML = hH; } safeStyle('hand-viewer', 'display', 'flex'); }
     function closeHandView() { safeStyle('hand-viewer', 'display', 'none'); }
@@ -529,8 +406,7 @@
     function calcFan(h, m, winTile, isZimo, isGangKai) { var fan = 1; var details = ["平胡"]; if((winTile==4 || winTile==13)) { if(h.indexOf(winTile-1)>-1 && h.indexOf(winTile+1)>-1) { fan *= 2; details.push("卡五星 x2"); } } if(m.length==0 && h.length==14 && is7(h)) { fan *= 4; details.push("七对 x4"); } else if(isPPH(h, m)) { fan *= 2; details.push("碰碰胡 x2"); } if(isGangKai) { fan *= 2; details.push("杠上开花 x2"); } if(isZimo) { details.push("自摸"); } else { details.push("捉炮"); } return {fan:fan, desc:details.join(" ")}; }
     function isPPH(h, m) { var pair = -1; var counts={}; for(var i=0;i<h.length;i++) counts[h[i]]=(counts[h[i]]||0)+1; for(var k in counts) if(counts[k]==2) { pair=parseInt(k); break; } if(pair==-1) return false; var cp = h.slice(); removeOne(cp, pair); removeOne(cp, pair); for(var i=0; i<cp.length; i+=3) if(cp[i] != cp[i+1] || cp[i] != cp[i+2]) return false; return true; }
     function showResult(winnerId, title, dummyS, dummyD, isZimo) { 
-        pauseBGM(); // 结算时暂停BGM
-        setTimeout(function(){ playSound(isZimo || winnerId===0 ? 'win' : 'lose'); }, 500); // 延时播放胜负音效
+        pauseBGM(); setTimeout(function(){ playSound(isZimo || winnerId===0 ? 'win' : 'lose'); }, 500); 
         safeStyle('modal', 'display', 'flex'); var rt = document.getElementById('res-title'); if(rt) rt.innerText = title; var p = G.ps[winnerId]; var winTile = isZimo ? p.hand[p.hand.length-1] : G.last; var fullH = p.hand.slice(); if(!isZimo) fullH.push(winTile); fullH.sort(function(a,b){return a-b}); var base = CUR_ROOM ? CUR_ROOM.base : 100; var res = calcFan(fullH, p.meld, winTile, isZimo, false); var fan = res.fan; var desc = res.desc; if(p.liang) { fan *= 2; desc += " 亮倒 x2"; } var score = base * fan; var rd = document.getElementById('res-desc'); if(rd) rd.innerText = desc + "\n总倍数: " + fan + "倍"; var userWin = (winnerId === 0); var rs = document.getElementById('res-score'); if(userWin) { SCORE += score; if(rs) { rs.innerText = "+" + score; rs.style.color = "#d32f2f"; } } else { SCORE -= score; if(rs) { rs.innerText = "-" + score; rs.style.color = "#388e3c"; } } updateGlobalScore(); saveData(); 
     }
     function render() { updateGlobalScore(); renderP(0, 'melds-0', 'hand-0', 'river-0', 'tag-0', 'ting-box-0', 't-tiles-0'); renderP(1, 'melds-1', 'hand-1', 'river-1', 'tag-1', 'ting-box-1', 't-tiles-1'); renderP(2, 'melds-2', 'hand-2', 'river-2', 'tag-2', 'ting-box-2', 't-tiles-2'); }
